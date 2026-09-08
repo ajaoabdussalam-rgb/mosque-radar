@@ -119,11 +119,15 @@ const getMosqueById = async (req, res, next) => {
  */
 const createMosque = async (req, res, next) => {
   try {
-    const { name, address, images, submittedBy } = req.body;
+    const submission = req.sanitizedSubmission || {
+      name: req.body.name,
+      address: req.body.address,
+      location: parseLocationInput(req.body),
+      images: Array.isArray(req.body.images) ? req.body.images : [],
+      submittedBy: req.body.submittedBy || 'anonymous'
+    };
 
-    const location = parseLocationInput(req.body);
-
-    if (!location) {
+    if (!submission.location) {
       return res.status(400).json({
         success: false,
         message: 'Valid geographic coordinates are required ([longitude, latitude])'
@@ -133,12 +137,12 @@ const createMosque = async (req, res, next) => {
     // Untrusted Input Rule:
     // Clients cannot self-verify or set moderation metadata on creation.
     const newMosque = new Mosque({
-      name,
-      address,
-      location,
-      images: Array.isArray(images) ? images : [],
-      submittedBy: submittedBy || 'anonymous',
-      status: 'pending' // Enforce pending status
+      name: submission.name,
+      address: submission.address,
+      location: submission.location,
+      images: submission.images,
+      submittedBy: submission.submittedBy,
+      status: 'pending' // Enforce pending status unconditionally
     });
 
     const savedMosque = await newMosque.save();
@@ -297,10 +301,103 @@ const getNearbyMosques = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get pending mosques awaiting moderation (moderation queue)
+ * @route   GET /api/mosques/moderation/queue
+ * @access  Public / Moderator
+ */
+const getPendingMosques = async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter = { status: 'pending' };
+
+    const [mosques, total] = await Promise.all([
+      Mosque.find(filter)
+        .sort({ createdAt: 1 }) // FIFO: review oldest submissions first
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Mosque.countDocuments(filter)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: mosques.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit) || 1,
+      data: mosques
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Verify or reject a community-submitted mosque
+ * @route   PATCH /api/mosques/:id/verify
+ * @access  Moderator / Admin
+ */
+const verifyMosque = async (req, res, next) => {
+  try {
+    const { status, verifiedBy, rejectionReason } = req.body;
+
+    if (!status || !['verified', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required and must be either "verified" or "rejected"'
+      });
+    }
+
+    if (status === 'rejected' && (!rejectionReason || !rejectionReason.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'A rejection reason is required when rejecting a mosque submission'
+      });
+    }
+
+    const mosque = await Mosque.findById(req.params.id);
+
+    if (!mosque) {
+      return res.status(404).json({
+        success: false,
+        message: 'Mosque not found'
+      });
+    }
+
+    // Apply verification state transition & audit fields
+    mosque.status = status;
+    mosque.verifiedAt = new Date();
+    mosque.verifiedBy = (verifiedBy && typeof verifiedBy === 'string' && verifiedBy.trim())
+      ? verifiedBy.trim()
+      : 'moderator';
+
+    if (status === 'rejected') {
+      mosque.rejectionReason = rejectionReason.trim();
+    } else {
+      mosque.rejectionReason = undefined; // Clear previous rejection reason if re-verifying
+    }
+
+    const savedMosque = await mosque.save();
+
+    res.status(200).json({
+      success: true,
+      data: savedMosque
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getMosques,
   getNearbyMosques,
+  getPendingMosques,
   getMosqueById,
   createMosque,
-  updateMosque
+  updateMosque,
+  verifyMosque
 };

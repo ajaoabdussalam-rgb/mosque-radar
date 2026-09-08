@@ -94,12 +94,19 @@ MongoDB Database
 - [x] Geospatial query endpoint `GET /api/mosques/nearby` implemented using `$geoNear` aggregation pipeline.
 - [x] Real-time spherical distance calculation (in meters and kilometers) generated dynamically without static persistence.
 - [x] Proximity sorting (nearest to farthest), radius filtering (`radius` and `radiusKm`), and default verified-only filtering.
+- [x] Dedicated submission validation & sanitization pipeline (`backend/middleware/validateSubmission.js`) attached to `POST /api/mosques`.
+- [x] Untrusted input defense: HTML/script tag stripping, character boundary enforcement, coordinate range bounds checking (`lng: [-180, 180]`, `lat: [-90, 90]`), and image array limits.
+- [x] Actionable field-level validation error maps returned on `400 Bad Request`.
+- [x] Image upload and validation pipeline implemented with `multer` (`backend/middleware/upload.js` and `POST /api/upload`).
+- [x] Strict security hardening: 5MB size limit, MIME whitelist (`image/jpeg`, `image/png`, `image/webp`), and randomized safe filename generation.
+- [x] Static image serving configured at `/uploads`, with zero raw binary buffers stored in MongoDB (URL references only).
+- [x] Moderation review workflow implemented: `PATCH /api/mosques/:id/verify` for `verified` and `rejected` transitions.
+- [x] Verification audit metadata recorded: `verifiedAt`, `verifiedBy`, and mandatory `rejectionReason` on rejection.
+- [x] Dedicated FIFO moderation queue endpoint: `GET /api/mosques/moderation/queue`.
+- [x] Public isolation confirmed: pending/rejected records excluded from public listings and nearby search by default.
 
 ### What is NOT YET BUILT (Do not treat as completed)
 - [ ] Browser geolocation integration
-- [ ] Mosque submission form and untrusted input validation pipeline
-- [ ] Image upload, storage, and validation system
-- [ ] Verification workflow (`pending`, `verified`, `rejected`)
 - [ ] Frontend application architecture (pages, components, routing, API client)
 - [ ] Frontend-to-backend API integration
 - [ ] User authentication and role-based authorization
@@ -165,7 +172,7 @@ MongoDB Database
   - Treating all incoming submission payloads as **untrusted input**.
   - Strict server-side sanitization and bounds checking (e.g., latitude [-90, 90], longitude [-180, 180]).
   - Returning actionable validation error messages to the client.
-- **Status:** **CURRENT / NEXT IMPLEMENTATION TASK**
+- **Status:** **COMPLETE**
 
 ---
 
@@ -176,7 +183,7 @@ MongoDB Database
   - Storing clean image URLs/identifiers in MongoDB, **never** raw binary buffers in document fields.
   - MIME type verification, file signature checks, file size limits.
   - Security hardening against malicious file uploads.
-- **Status:** PLANNED
+- **Status:** **COMPLETE**
 
 ---
 
@@ -186,7 +193,7 @@ MongoDB Database
   - Explicit status states: `pending`, `verified`, `rejected`.
   - Default public discovery queries only show `verified` mosques (or clearly badge `pending` ones).
   - Verification audit metadata (who verified, timestamp, rejection reasons).
-- **Status:** PLANNED
+- **Status:** **COMPLETE**
 
 ---
 
@@ -198,7 +205,7 @@ MongoDB Database
   - Reusable UI elements (cards, badges, modals, spinners, alerts).
   - Lightweight, predictable state management without unnecessary third-party overhead.
   - Design tokens, typography, and cohesive modern styling.
-- **Status:** PLANNED
+- **Status:** **CURRENT / NEXT IMPLEMENTATION TASK**
 
 ---
 

@@ -6,6 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const connectDB = require('./config/db');
 const testRoutes = require('./routes/testRoutes');
 const mosqueRoutes = require('./routes/mosqueRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 // --- Create Express app ---
@@ -23,9 +24,13 @@ app.use(cors(corsOptions));
 // --- Body parsing ---
 app.use(express.json());
 
+// --- Static file serving for uploads ---
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // --- Routes ---
 app.use('/api/test', testRoutes);
 app.use('/api/mosques', mosqueRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // --- Global error handler (must be registered after all routes) ---
 app.use(errorHandler);

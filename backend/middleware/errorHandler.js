@@ -33,6 +33,18 @@ const errorHandler = (err, req, res, next) => {
     message = `Invalid format for parameter '${err.path}'`;
   }
 
+  // Multer upload errors
+  if (err.name === 'MulterError') {
+    statusCode = 400;
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      message = 'File is too large. Maximum allowed size is 5MB.';
+    } else if (err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT') {
+      message = 'Too many files uploaded or unexpected upload field.';
+    } else {
+      message = err.message || 'File upload error.';
+    }
+  }
+
   res.status(statusCode).json({
     success: false,
     message: message,
