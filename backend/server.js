@@ -1,26 +1,50 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+const connectDB = require('./config/db');
+const testRoutes = require('./routes/testRoutes');
+const mosqueRoutes = require('./routes/mosqueRoutes');
+const errorHandler = require('./middleware/errorHandler');
+
+// --- Create Express app ---
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
-app.use(express.json()); // Parses incoming JSON data
+// --- CORS ---
+// Uses CLIENT_URL from .env when set, otherwise allows all origins (development default).
+// Restrict this to the real frontend origin before deploying to production.
+const corsOptions = {
+  origin: process.env.CLIENT_URL || '*',
+};
+app.use(cors(corsOptions));
 
-// Sample Route
-app.get('/api/test', (req, res) => {
-  res.json({ message: "Hello from the Express backend!" });
-});
+// --- Body parsing ---
+app.use(express.json());
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected Successfully"))
-  .catch(err => console.error("MongoDB connection error:", err));
+// --- Routes ---
+app.use('/api/test', testRoutes);
+app.use('/api/mosques', mosqueRoutes);
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// --- Global error handler (must be registered after all routes) ---
+app.use(errorHandler);
+
+// --- Startup sequence ---
+// 1. Connect to MongoDB
+// 2. Only start the Express server after the database connection succeeds
+// If the database connection fails, connectDB will exit the process
+// with a clear error message — the server will never start without a database.
+const startServer = async () => {
+  await connectDB();
+
+  return app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;
