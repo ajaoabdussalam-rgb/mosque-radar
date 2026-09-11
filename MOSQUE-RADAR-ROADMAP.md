@@ -104,11 +104,11 @@ MongoDB Database
 - [x] Verification audit metadata recorded: `verifiedAt`, `verifiedBy`, and mandatory `rejectionReason` on rejection.
 - [x] Dedicated FIFO moderation queue endpoint: `GET /api/mosques/moderation/queue`.
 - [x] Public isolation confirmed: pending/rejected records excluded from public listings and nearby search by default.
+- [x] Frontend application architecture (`components/`, `pages/`, `layouts/`, `services/`, `hooks/`, routing via `react-router-dom`, design tokens, and verified build).
+- [x] Browser geolocation custom hook (`useGeolocation`) abstraction with permission and error handling.
+- [x] Frontend-to-backend API integration & end-to-end verification (Vite dev proxy, centralized API client, live database queries, proximity sorting, and moderation workflow).
 
 ### What is NOT YET BUILT (Do not treat as completed)
-- [ ] Browser geolocation integration
-- [ ] Frontend application architecture (pages, components, routing, API client)
-- [ ] Frontend-to-backend API integration
 - [ ] User authentication and role-based authorization
 - [ ] Admin moderation dashboard
 - [ ] External API integration
@@ -200,35 +200,47 @@ MongoDB Database
 ### Phase 7 — Frontend Architecture
 - **Goal:** Transform the default Vite template into a modular, production-ready React application.
 - **Key Capabilities:**
-  - Page routing (e.g., `react-router-dom`): Home, Discover/Map, Mosque Detail, Submit Mosque.
+  - Page routing (`react-router-dom`): Home, Explore Directory, Mosque Detail, Submit Mosque, Moderation Queue, and 404 page with `MainLayout` shell.
   - Clean component directory structure: `components/`, `pages/`, `layouts/`, `services/`, `hooks/`.
-  - Reusable UI elements (cards, badges, modals, spinners, alerts).
-  - Lightweight, predictable state management without unnecessary third-party overhead.
-  - Design tokens, typography, and cohesive modern styling.
-- **Status:** **CURRENT / NEXT IMPLEMENTATION TASK**
+  - Reusable UI elements (`MosqueCard`, `Navbar`, `LoadingSpinner`, `Alert`, `Badge`, `Modal`).
+  - Browser geolocation abstraction (`useGeolocation` hook) managing device GPS, permissions, timeouts, and manual coordinate overrides.
+  - Design tokens, typography, and cohesive dark-mode glassmorphic styling.
+  - React 19 strict hook compliance and clean ESLint checks.
+- **Verification & Test Outcomes:**
+  - `npm run lint`: Passed with 0 errors and 0 warnings.
+  - `npm run build`: Production bundle generated cleanly (built in <1s).
+  - Dev server verified locally via HTTP check on port 5173.
+- **Status:** **COMPLETE**
 
 ---
 
 ### Phase 8 — Frontend/Backend Integration
 - **Goal:** Wire the React client to the Express API.
 - **Key Capabilities:**
-  - Centralized API client module with base URL configuration and error handling.
-  - Vite dev server proxy setup to prevent local CORS issues.
-  - Rendering mosque listings with live backend data.
-  - Interactive "Add Mosque" submission form with real-time feedback.
-  - Loading skeletons, empty states, and user-friendly error banners.
-- **Status:** PLANNED
+  - Centralized API client module (`frontend/src/services/api.js`) with base URL configuration and error handling.
+  - Vite dev server proxy setup (`/api` and `/uploads` mapped to `http://localhost:5000`) preventing local CORS issues.
+  - Rendering mosque listings with live backend data from MongoDB.
+  - Interactive "Add Mosque" submission form with real-time feedback, coordinate autofill, and image upload.
+  - Shimmer glassmorphic loading skeletons (`MosqueSkeleton`), empty states, and user-friendly alert banners (`Alert`).
+  - Safe development seed script (`npm run seed`) with realistic coordinates and metadata.
+- **Verification & Test Outcomes:**
+  - Automated test suite (`npm test` / `node scripts/verify-integration.js`): **12/12 integration tests passed**.
+  - Verified live proximity queries (`GET /api/mosques/nearby`), radius filtering (2–25km), dynamic spherical distance calculations, submission moderation pipeline, and public directory isolation.
+  - `npm run lint`: **0 errors, 0 warnings**.
+  - `npm run build`: Production bundle built cleanly in <1s.
+- **Status:** **COMPLETE**
 
 ---
 
 ### Phase 9 — Search & Discovery
 - **Goal:** Provide rich search, filtering, and optional external data enrichment.
+- **Status:** **CURRENT / NEXT IMPLEMENTATION TASK**
 - **Key Capabilities:**
   - Text search by mosque name or locality.
   - Radius filtering (e.g., 2km, 5km, 10km).
   - Map view integration (e.g., Leaflet or map provider).
   - **External API Evaluation:** Thoroughly evaluate whether third-party APIs (e.g., Overpass/OSM, Google Places) are needed to fill coverage gaps. If used, calls flow strictly through our backend, keys remain private, and results are marked as candidate/external data rather than automatically verified Mosque Radar records.
-- **Status:** PLANNED
+- **Status:** **CURRENT / NEXT IMPLEMENTATION TASK**
 
 ---
 

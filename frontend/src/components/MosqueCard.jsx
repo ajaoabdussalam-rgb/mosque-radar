@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import Badge from './Badge';
 
 export default function MosqueCard({ mosque }) {
   const {
@@ -34,16 +35,15 @@ export default function MosqueCard({ mosque }) {
 
         <div className="media-badges">
           {status && (
-            <span className={`badge badge-${status}`}>
-              {status === 'verified' && '✓ '}
+            <Badge variant={status}>
               {status}
-            </span>
+            </Badge>
           )}
 
           {distanceKm !== undefined && (
-            <span className="badge badge-distance">
-              📍 {distanceKm < 1 ? `${distanceMeters}m` : `${distanceKm}km`}
-            </span>
+            <Badge variant="distance" icon="📍">
+              {distanceKm < 1 ? `${distanceMeters}m` : `${distanceKm}km`}
+            </Badge>
           )}
         </div>
       </div>

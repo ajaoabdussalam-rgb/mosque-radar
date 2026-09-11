@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Alert from '../components/Alert';
+import Badge from '../components/Badge';
 
 export default function MosqueDetailPage() {
   const { id } = useParams();
@@ -9,24 +11,38 @@ export default function MosqueDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedImg, setSelectedImg] = useState(0);
+  const [copiedNotification, setCopiedNotification] = useState(false);
 
   useEffect(() => {
-    const fetchDetail = async () => {
+    let ignore = false;
+
+    async function loadDetail() {
       try {
-        setLoading(true);
-        setError(null);
         const res = await api.getMosqueById(id);
-        setMosque(res.data);
+        if (!ignore) {
+          setMosque(res.data);
+          setError(null);
+        }
       } catch (err) {
-        setError(err.message || 'Could not find mosque record.');
+        if (!ignore) {
+          setError(err.message || 'Could not find mosque record.');
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
+    }
+
+    loadDetail();
+
+    return () => {
+      ignore = true;
     };
-    fetchDetail();
   }, [id]);
 
   if (loading) return <LoadingSpinner text="Loading mosque details..." />;
+
   if (error || !mosque) {
     return (
       <div className="glass-card error-card">
@@ -45,11 +61,29 @@ export default function MosqueDetailPage() {
 
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({ title: name, url: window.location.href }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      setCopiedNotification(true);
+      setTimeout(() => setCopiedNotification(false), 3000);
+    }
+  };
+
   return (
     <div className="detail-page">
-      <div className="breadcrumb">
+      <nav className="breadcrumb" aria-label="Breadcrumb">
         <Link to="/">← Radar</Link> / <span>{name}</span>
-      </div>
+      </nav>
+
+      {copiedNotification && (
+        <Alert
+          type="success"
+          message="Direct link copied to clipboard!"
+          onClose={() => setCopiedNotification(false)}
+        />
+      )}
 
       <div className="detail-layout">
         {/* Gallery / Visual Column */}
@@ -69,8 +103,10 @@ export default function MosqueDetailPage() {
                   {images.map((img, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => setSelectedImg(idx)}
                       className={`thumb-btn ${selectedImg === idx ? 'thumb-active' : ''}`}
+                      aria-label={`View photo ${idx + 1}`}
                     >
                       <img src={img} alt="" className="thumb-img" />
                     </button>
@@ -80,7 +116,7 @@ export default function MosqueDetailPage() {
             </>
           ) : (
             <div className="detail-placeholder">
-              <span className="huge-icon">🕌</span>
+              <span className="huge-icon" role="img" aria-label="mosque">🕌</span>
               <p>No community photos submitted yet</p>
             </div>
           )}
@@ -89,9 +125,9 @@ export default function MosqueDetailPage() {
         {/* Info Column */}
         <div className="info-col glass-card">
           <div className="info-header">
-            <span className={`badge badge-${status}`}>
-              {status === 'verified' ? '✓ Verified Location' : `${status} submission`}
-            </span>
+            <Badge variant={status}>
+              {status === 'verified' ? 'Verified Location' : `${status} submission`}
+            </Badge>
             <span className="submitter-tag">Submitted by: {submittedBy || 'Anonymous'}</span>
           </div>
 
@@ -102,7 +138,7 @@ export default function MosqueDetailPage() {
             <p className="info-value">📍 {address}</p>
           </div>
 
-          {lat && lng && (
+          {lat !== undefined && lng !== undefined && (
             <div className="info-block">
               <span className="info-label">Geographic Coordinates (WGS84)</span>
               <div className="coords-row">
@@ -113,9 +149,11 @@ export default function MosqueDetailPage() {
           )}
 
           {rejectionReason && (
-            <div className="alert alert-error" style={{ marginTop: '16px' }}>
-              <strong>Rejection Note:</strong> {rejectionReason}
-            </div>
+            <Alert
+              type="error"
+              title="Rejection Note"
+              message={rejectionReason}
+            />
           )}
 
           <div className="meta-dates">
@@ -133,14 +171,8 @@ export default function MosqueDetailPage() {
               Open in Google Maps ↗
             </a>
             <button
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({ title: name, url: window.location.href });
-                } else {
-                  navigator.clipboard.writeText(window.location.href);
-                  alert('Link copied to clipboard!');
-                }
-              }}
+              type="button"
+              onClick={handleShare}
               className="btn btn-secondary"
             >
               Share Location 🔗
@@ -158,31 +190,32 @@ export default function MosqueDetailPage() {
 
         .breadcrumb a {
           color: var(--text-secondary);
+          text-decoration: none;
         }
 
-        .breadcrumb span {
-          color: var(--text-primary);
+        .breadcrumb a:hover {
+          color: var(--primary-400);
         }
 
         .detail-layout {
           display: grid;
-          grid-template-columns: 1.1fr 1fr;
-          gap: 30px;
+          grid-template-columns: 1fr 1fr;
+          gap: 32px;
         }
 
         .gallery-col {
-          padding: 20px;
           display: flex;
           flex-direction: column;
           gap: 16px;
+          overflow: hidden;
         }
 
         .main-image-box {
           width: 100%;
           height: 380px;
-          border-radius: var(--radius-sm);
+          border-radius: var(--radius-md);
           overflow: hidden;
-          background: #000;
+          background: #090e17;
         }
 
         .main-detail-img {
@@ -199,19 +232,21 @@ export default function MosqueDetailPage() {
         }
 
         .thumb-btn {
-          width: 70px;
-          height: 70px;
-          border-radius: 8px;
-          border: 2px solid transparent;
-          background: transparent;
-          cursor: pointer;
+          width: 76px;
+          height: 56px;
+          border-radius: var(--radius-sm);
           overflow: hidden;
           padding: 0;
+          border: 2px solid transparent;
+          background: #0d131f;
+          cursor: pointer;
           flex-shrink: 0;
+          transition: all 0.2s;
         }
 
         .thumb-active {
           border-color: var(--primary-500);
+          transform: translateY(-2px);
         }
 
         .thumb-img {
@@ -221,87 +256,104 @@ export default function MosqueDetailPage() {
         }
 
         .detail-placeholder {
-          height: 380px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          background: rgba(16, 185, 129, 0.05);
-          border-radius: var(--radius-sm);
+          height: 340px;
           color: var(--text-muted);
         }
 
         .huge-icon {
-          font-size: 4.5rem;
+          font-size: 4rem;
           margin-bottom: 12px;
         }
 
         .info-col {
-          padding: 32px;
           display: flex;
           flex-direction: column;
+          gap: 20px;
         }
 
         .info-header {
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          margin-bottom: 16px;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 10px;
         }
 
         .submitter-tag {
-          font-size: 0.8rem;
+          font-size: 0.85rem;
           color: var(--text-muted);
         }
 
         .detail-title {
-          font-size: 2.1rem;
-          margin-bottom: 24px;
+          font-size: 2.2rem;
           line-height: 1.25;
+          margin: 0;
         }
 
         .info-block {
-          margin-bottom: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
 
         .info-label {
-          display: block;
-          font-size: 0.78rem;
-          font-weight: 700;
+          font-size: 0.82rem;
           text-transform: uppercase;
           letter-spacing: 0.05em;
           color: var(--text-muted);
-          margin-bottom: 6px;
+          font-weight: 700;
         }
 
         .info-value {
           font-size: 1.05rem;
           color: var(--text-primary);
+          margin: 0;
         }
 
         .coords-row {
           display: flex;
           gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .coord-chip {
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid var(--border-subtle);
+          padding: 6px 12px;
+          border-radius: var(--radius-sm);
+          font-family: monospace;
+          font-size: 0.9rem;
+          color: var(--primary-400);
         }
 
         .meta-dates {
-          margin-top: auto;
-          padding-top: 20px;
-          border-top: 1px solid var(--border-subtle);
           display: flex;
-          justify-content: space-between;
-          font-size: 0.8rem;
+          gap: 20px;
+          font-size: 0.82rem;
           color: var(--text-muted);
-          margin-bottom: 24px;
+          border-top: 1px solid var(--border-subtle);
+          padding-top: 16px;
         }
 
         .action-buttons {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
+          display: flex;
+          gap: 12px;
+          margin-top: 8px;
+          flex-wrap: wrap;
         }
 
-        @media (max-width: 860px) {
+        .error-card {
+          text-align: center;
+          padding: 60px 20px;
+          max-width: 500px;
+          margin: 40px auto;
+        }
+
+        @media (max-width: 840px) {
           .detail-layout {
             grid-template-columns: 1fr;
           }

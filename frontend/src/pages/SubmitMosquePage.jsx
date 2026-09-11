@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
+import Alert from '../components/Alert';
+import Badge from '../components/Badge';
 
 export default function SubmitMosquePage() {
   const [formData, setFormData] = useState({
@@ -133,6 +136,7 @@ export default function SubmitMosquePage() {
         </div>
         <div className="success-actions">
           <button
+            type="button"
             onClick={() => {
               setSuccessData(null);
               setFormData({ name: '', address: '', latitude: '', longitude: '', submittedBy: '' });
@@ -143,9 +147,9 @@ export default function SubmitMosquePage() {
           >
             + Submit Another Mosque
           </button>
-          <a href="/" className="btn btn-secondary">
+          <Link to="/" className="btn btn-secondary">
             Return to Radar
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -154,14 +158,24 @@ export default function SubmitMosquePage() {
   return (
     <div className="submit-page">
       <div className="submit-header">
-        <h1>Submit a Discovered Mosque</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <h1 style={{ margin: 0 }}>Submit a Discovered Mosque</h1>
+          <Badge variant="primary">Community Contribution</Badge>
+        </div>
         <p className="submit-sub">
           Help travelers and locals discover prayer spaces in your area.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="submit-form glass-card">
-        {generalError && <div className="alert alert-error">{generalError}</div>}
+        {generalError && (
+          <Alert
+            type="error"
+            title="Submission Error"
+            message={generalError}
+            onClose={() => setGeneralError(null)}
+          />
+        )}
 
         {/* Mosque Name */}
         <div className="form-group">

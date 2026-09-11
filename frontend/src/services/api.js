@@ -36,7 +36,7 @@ async function request(endpoint, options = {}) {
   let json;
   try {
     json = await res.json();
-  } catch (err) {
+  } catch {
     throw new ApiError('Failed to parse server response', res.status);
   }
 
