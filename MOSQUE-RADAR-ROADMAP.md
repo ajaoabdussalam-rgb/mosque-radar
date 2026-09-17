@@ -107,13 +107,26 @@ MongoDB Database
 - [x] Frontend application architecture (`components/`, `pages/`, `layouts/`, `services/`, `hooks/`, routing via `react-router-dom`, design tokens, and verified build).
 - [x] Browser geolocation custom hook (`useGeolocation`) abstraction with permission and error handling.
 - [x] Frontend-to-backend API integration & end-to-end verification (Vite dev proxy, centralized API client, live database queries, proximity sorting, and moderation workflow).
+- [x] User registration, JWT authentication, and role-based permissions (`user`, `moderator`, `admin`).
+- [x] User profile management and submission tracking ("Mosques I've submitted").
+- [x] Protected moderation queue & decision endpoints (`/api/mosques/moderation/queue`, `/:id/verify`) guarded by `protect, authorize('moderator', 'admin')`.
+- [x] Admin moderation center with status tabs (`pending`, `verified`, `rejected`), duplicate detection assistance, and inline editing.
+- [x] Duplicate detection assistance endpoint (`GET /api/mosques/moderation/duplicates`) via proximity ($geoNear) and name similarity.
+- [x] Moderation rejection audit with mandatory reason requirement.
+- [x] Security HTTP headers configured with `helmet` (`nosniff`, `cross-origin` CORP, clickjacking defense).
+- [x] Rate limiting configured with `express-rate-limit` (general API tier and brute-force mitigation on auth).
+- [x] NoSQL operator injection defense middleware rejecting malicious `$`/`.` keys.
+- [x] CORS origin lockdown and preflight verification.
+- [x] Isolated backend unit test suite (`npm run test:unit`) covering Haversine distance calculations, GeoJSON coordinate boundaries, NoSQL sanitizer, role authorization, and bcrypt hashing (14/14 tests passing).
+- [x] Frontend contract and architecture test suite (`npm test` in frontend) validating route registrations, API service contracts, and design tokens (42/42 tests passing).
+- [x] Comprehensive end-to-end integration and security test suite (`npm run test:integration` - 41/41 tests passing).
+- [x] Production deployment configuration: Render blueprint (`render.yaml`), Vercel SPA routing (`vercel.json`), Netlify/Cloudflare SPA redirects (`_redirects`), and frontend/backend `.env.example` templates.
+- [x] Enhanced health monitoring endpoint (`GET /api/health` & `GET /api/test`) reporting database connectivity, readyState, and server uptime.
+- [x] Automated MongoDB Atlas index verification (`Mosque.createIndexes()` on database connection).
+- [x] Complete production deployment guide (`DEPLOYMENT-GUIDE.md`).
 
-### What is NOT YET BUILT (Do not treat as completed)
-- [ ] User authentication and role-based authorization
-- [ ] Admin moderation dashboard
-- [ ] External API integration
-- [ ] Automated testing suite
-- [ ] Production deployment and hardening
+### What is NOT YET BUILT (Optional Future Enhancements)
+- [ ] External API integration (optional third-party mosque gap-filling / enrichment)
 
 ---
 
@@ -233,67 +246,103 @@ MongoDB Database
 ---
 
 ### Phase 9 — Search & Discovery
-- **Goal:** Provide rich search, filtering, and optional external data enrichment.
-- **Status:** **CURRENT / NEXT IMPLEMENTATION TASK**
+- **Goal:** Provide rich search, filtering, and interactive map discovery.
 - **Key Capabilities:**
-  - Text search by mosque name or locality.
-  - Radius filtering (e.g., 2km, 5km, 10km).
-  - Map view integration (e.g., Leaflet or map provider).
-  - **External API Evaluation:** Thoroughly evaluate whether third-party APIs (e.g., Overpass/OSM, Google Places) are needed to fill coverage gaps. If used, calls flow strictly through our backend, keys remain private, and results are marked as candidate/external data rather than automatically verified Mosque Radar records.
-- **Status:** **CURRENT / NEXT IMPLEMENTATION TASK**
+  - Full-text search on `name` and `address` powered by MongoDB `$text` index with relevance scoring (`textScore`).
+  - Proximity-based radius filtering on the Explore Directory (`2km`, `5km`, `10km`, `25km`, `All`) utilizing browser geolocation and `$geoNear`.
+  - Interactive Leaflet map view (`MapView.jsx`) rendering custom-styled mosque markers with coordinates, details popup, Google Maps directions links, and dark-theme tile styling.
+  - Seamless List ↔ Map toggle with zero redundant network requests.
+  - Debounced search queries (300ms) with pagination and clear-filter controls.
+  - Responsive grid layout (`.mosque-grid`) ensuring consistent card alignment across all viewports.
+- **Verification & Test Outcomes:**
+  - Automated test suite (`npm test` / `node scripts/verify-integration.js`): **14/14 integration tests passed** (including text search and empty query assertions).
+  - `npm run lint`: **0 errors, 0 warnings**.
+  - `npm run build`: Production bundle built cleanly with Leaflet integration in <2s.
+- **Status:** **COMPLETE**
 
 ---
 
 ### Phase 10 — Authentication & Authorization
 - **Goal:** Introduce user identities and role-based permissions when required by business logic.
 - **Key Capabilities:**
-  - User registration and login (password hashing with `bcrypt`, secure session/JWT tokens).
-  - User profile and submission tracking ("Mosques I've submitted").
-  - Role definition (`user`, `moderator`, `admin`).
-- **Status:** PLANNED
+  - User registration and login (password hashing with `bcryptjs`, secure session/JWT tokens).
+  - User profile and submission tracking ("Mosques I've submitted" via `GET /api/auth/my-submissions`).
+  - Role definition (`user`, `moderator`, `admin`) and middleware enforcement (`protect`, `authorize`, `optionalAuth`).
+  - Route protection: `/api/mosques/moderation/queue` and `PATCH /api/mosques/:id/verify` restricted to `moderator` and `admin`.
+  - Frontend authentication layer: `AuthContext`, `useAuth` hook, `LoginPage`, `RegisterPage`, `ProfilePage`, and `ProtectedRoute` route wrapper.
+- **Verification & Test Outcomes:**
+  - Automated test suite (`npm test` / `node scripts/verify-integration.js`): **25/25 integration & auth tests passed**.
+  - Verified user registration, duplicate email rejection (400), login authentication, bad password rejection (401), Bearer token profile fetch, unauthenticated access rejection (401), role-based forbidden access rejection (403), moderator queue access, authenticated submission attaching `createdBy`, moderator approval workflow, public directory synchronization, and user submission tracking.
+  - `npm run lint`: **0 errors, 0 warnings**.
+  - `npm run build`: Production bundle built cleanly in <1s.
+- **Status:** **COMPLETE**
 
 ---
 
 ### Phase 11 — Admin & Moderation
 - **Goal:** Provide administrative tools to govern community submissions.
 - **Key Capabilities:**
-  - Moderation queue endpoint & interface for `pending` submissions.
-  - One-click verify, reject, or edit actions.
-  - Duplicate detection assistance.
-- **Status:** PLANNED
+  - Moderation queue endpoint & interface (`GET /api/mosques/moderation/queue`) with status filtering (`pending`, `verified`, `rejected`, `all`).
+  - Proximity and text-similarity duplicate detection assistance (`GET /api/mosques/moderation/duplicates`).
+  - Reusable moderation center UI (`ModerationPage.jsx`) with status tabs, duplicate warning drawers, and inline editing modal (`PATCH /api/mosques/:id`).
+  - Strict audit logging for approvals and rejections (`verifiedBy`, `verifiedAt`, and mandatory `rejectionReason`).
+- **Verification & Test Outcomes:**
+  - Automated test suite (`npm test` / `node scripts/verify-integration.js`): **34/34 integration, auth & moderation tests passed**.
+  - Verified duplicate detection by proximity within 500m, name similarity matching, unauthenticated (401) and non-moderator (403) route protection, inline editing of mosque details, mandatory rejection reason enforcement (400), moderator approval workflow, status filtering on queue queries, and public directory visibility synchronization.
+  - `npm run lint`: **0 errors, 0 warnings**.
+  - `npm run build`: Production bundle built cleanly in <1s.
+- **Status:** **COMPLETE**
 
 ---
 
 ### Phase 12 — Security & Production Hardening
 - **Goal:** Perform end-to-end security audit and production hardening.
 - **Key Capabilities:**
-  - Security headers (`helmet`), API rate limiting (`express-rate-limit`).
-  - NoSQL injection prevention and strict input sanitization.
-  - CORS lockdown to production domain.
-  - Secret audits (ensuring zero credentials in client bundles or git logs).
-- **Status:** PLANNED
+  - Security HTTP headers via `helmet` (MIME sniffing prevention `nosniff`, frame clickjacking defense `SAMEORIGIN`, and `cross-origin` resource policy for `/uploads` images).
+  - Multi-tier API rate limiting via `express-rate-limit` (300 req/15min general tier, 30 req/15min strict auth brute-force mitigation).
+  - NoSQL operator injection defense middleware (`sanitizeInput.js`) recursively filtering prohibited `$`/`.` keys from query, body, and params.
+  - CORS lockdown with preflight options validation against configured client origin.
+  - Secret audits: `.env` guarded by `.gitignore`, `.env.example` template maintained, zero secrets exposed to frontend bundles.
+- **Verification & Test Outcomes:**
+  - Automated test suite (`npm test` / `node scripts/verify-integration.js`): **41/41 integration, auth, moderation & security tests passed**.
+  - Verified `X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: cross-origin`, `X-Frame-Options: SAMEORIGIN`, `RateLimit-Limit: 300` headers, NoSQL body injection `$gt` rejection (400), NoSQL query injection `$where` rejection (400), and CORS preflight options responses.
+  - `npm run lint`: **0 errors, 0 warnings**.
+  - `npm run build`: Production bundle built cleanly in <1s.
+- **Status:** **COMPLETE**
 
 ---
 
 ### Phase 13 — Testing
-- **Goal:** Establish confidence with focused automated and integration tests.
+- **Goal:** Establish confidence with focused automated, unit, contract, and integration tests.
 - **Key Capabilities:**
-  - Unit tests for distance calculations and validation rules.
-  - API integration tests (Supertest) for endpoint contracts and error responses.
-  - Geospatial query verification with sample coordinates.
-  - Critical frontend flow testing.
-- **Status:** PLANNED
+  - Isolated backend unit tests (`backend/scripts/verify-unit.js`): Haversine distance calculations, GeoJSON coordinate boundaries, NoSQL injection sanitizer, role-based authorization, and bcrypt password hashing.
+  - End-to-end integration and security test suite (`backend/scripts/verify-integration.js`): full lifecycle testing across directory queries, proximity sorting, text search, user authentication, role gates, moderation queue, duplicate detection, and security headers.
+  - Frontend contract and architecture test suite (`frontend/scripts/verify-frontend.js`): router route completeness, page registrations, centralized API client methods, and design system tokens.
+  - Standardized npm test commands: `npm run test:unit`, `npm run test:integration`, and unified `npm test`.
+- **Verification & Test Outcomes:**
+  - Backend unit tests (`npm run test:unit`): **14/14 passed**.
+  - Backend integration & security tests (`npm run test:integration`): **41/41 passed**.
+  - Frontend contract & architecture tests (`npm test` in `frontend`): **42/42 passed**.
+  - Cross-stack total: **97/97 tests passed** with zero failures.
+  - `npm run lint`: **0 errors, 0 warnings**.
+  - `npm run build`: Production bundle built cleanly in <1s.
+- **Status:** **COMPLETE**
 
 ---
 
 ### Phase 14 — Deployment
 - **Goal:** Ship Mosque Radar to production infrastructure.
 - **Key Capabilities:**
-  - Production MongoDB Atlas provisioning and indexing.
-  - Backend hosting (e.g., Render, Railway, Fly.io) with environment variable injection.
-  - Frontend hosting (e.g., Vercel, Netlify, Cloudflare Pages).
-  - Production build verification and health monitoring.
-- **Status:** PLANNED
+  - Automated MongoDB Atlas indexing: `Mosque.createIndexes()` executes on connection, ensuring `2dsphere` geospatial and text search indexes exist automatically on fresh production clusters.
+  - Backend deployment infrastructure: blueprint descriptor (`render.yaml`), health check path (`/api/health`), and environment variable templates.
+  - Frontend SPA routing configuration: Vercel rewrite rules (`vercel.json`), Netlify/Cloudflare redirects (`_redirects`), and production bundle optimization.
+  - Comprehensive production deployment guide ([DEPLOYMENT-GUIDE.md](file:///c:/Users/DELL/Desktop/mosque-radar/DEPLOYMENT-GUIDE.md)) covering MongoDB Atlas, Render, Vercel, CORS origin lockdown, and smoke test checklists.
+  - Enhanced production health monitor endpoint (`GET /api/health` & `GET /api/test`) returning database connection state, readyState, and server uptime.
+- **Verification & Test Outcomes:**
+  - Full automated suite: **97/97 tests passed** (14 backend unit, 41 backend integration/security, 42 frontend contract).
+  - Production builds: Backend starts with automated index verification; frontend builds cleanly via `vite build` in <1s.
+  - Production health check verified returning structured JSON with uptime and database status.
+- **Status:** **COMPLETE**
 
 ---
 

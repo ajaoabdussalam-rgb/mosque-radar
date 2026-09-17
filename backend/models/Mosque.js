@@ -59,6 +59,10 @@ const mosqueSchema = new mongoose.Schema(
       default: 'pending',
       index: true
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
     submittedBy: {
       type: String,
       default: 'anonymous',
@@ -83,5 +87,8 @@ const mosqueSchema = new mongoose.Schema(
 
 // 2dsphere index for geospatial proximity queries ($near, $geoNear, $geoWithin)
 mosqueSchema.index({ location: '2dsphere' });
+
+// Text index for full-text search on mosque name and address
+mosqueSchema.index({ name: 'text', address: 'text' });
 
 module.exports = mongoose.model('Mosque', mosqueSchema);

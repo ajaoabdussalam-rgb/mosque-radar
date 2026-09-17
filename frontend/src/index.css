@@ -309,3 +309,29 @@ a:hover {
   border: 1px solid rgba(16, 185, 129, 0.3);
   color: #6ee7b7;
 }
+
+/* Mosque Card Grid Layout */
+.mosque-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .mosque-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* Global Leaflet Map Overrides */
+.leaflet-container {
+  font-family: var(--font-body);
+  background-color: #0b111a !important;
+}
+
+/* Tile filter to seamlessly blend OpenStreetMap into our dark theme */
+:root:not([data-theme='light']) .leaflet-tile-pane {
+  filter: brightness(0.65) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.75);
+}
+

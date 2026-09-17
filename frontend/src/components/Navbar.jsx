@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Navbar() {
   const location = useLocation();
+  const { user, isAuthenticated, isModerator } = useAuth();
   const [theme, setTheme] = useState(
     localStorage.getItem('theme') || 'dark'
   );
@@ -19,9 +21,12 @@ export default function Navbar() {
   const navLinks = [
     { to: '/', label: 'Nearby Radar' },
     { to: '/explore', label: 'Explore All' },
-    { to: '/submit', label: '+ Add Mosque' },
-    { to: '/moderation', label: 'Review Queue' }
+    { to: '/submit', label: '+ Add Mosque' }
   ];
+
+  if (isModerator) {
+    navLinks.push({ to: '/moderation', label: 'Review Queue 🛡️' });
+  }
 
   return (
     <header className="navbar-container">
@@ -50,6 +55,23 @@ export default function Navbar() {
               </Link>
             );
           })}
+
+          {isAuthenticated ? (
+            <Link
+              to="/profile"
+              className={`user-nav-pill ${location.pathname === '/profile' ? 'user-nav-active' : ''}`}
+              title="View my profile & submissions"
+            >
+              <span className="user-avatar-dot">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </span>
+              <span className="user-nav-name">{user?.name}</span>
+            </Link>
+          ) : (
+            <Link to="/login" className="nav-signin-btn">
+              Sign In
+            </Link>
+          )}
 
           <button
             onClick={toggleTheme}
@@ -177,6 +199,68 @@ export default function Navbar() {
 
         .theme-toggle-btn:hover {
           background: rgba(255, 255, 255, 0.15);
+        }
+
+        .user-nav-pill {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px;
+          background: rgba(16, 185, 129, 0.1);
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          border-radius: var(--radius-full);
+          text-decoration: none;
+          color: var(--text-primary);
+          font-size: 0.88rem;
+          font-weight: 600;
+          transition: all 0.2s ease;
+        }
+
+        .user-nav-pill:hover {
+          background: rgba(16, 185, 129, 0.18);
+          border-color: var(--primary-500);
+        }
+
+        .user-nav-active {
+          border-color: var(--primary-500);
+          box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+        }
+
+        .user-avatar-dot {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: var(--primary-500);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.75rem;
+          font-weight: 700;
+        }
+
+        .user-nav-name {
+          max-width: 120px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .nav-signin-btn {
+          padding: 8px 18px;
+          background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
+          color: white !important;
+          border-radius: var(--radius-sm);
+          font-size: 0.88rem;
+          font-weight: 600;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+        }
+
+        .nav-signin-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
         }
 
         @media (max-width: 640px) {

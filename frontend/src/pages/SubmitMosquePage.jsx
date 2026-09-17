@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import Alert from '../components/Alert';
 import Badge from '../components/Badge';
 
 export default function SubmitMosquePage() {
+  const { user, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -103,7 +105,7 @@ export default function SubmitMosquePage() {
         latitude: lat,
         longitude: lng,
         images: uploadedImageUrls,
-        submittedBy: formData.submittedBy.trim() || 'Community Member'
+        submittedBy: formData.submittedBy.trim() || user?.name || 'Community Member'
       };
 
       const res = await api.createMosque(payload);
@@ -135,15 +137,20 @@ export default function SubmitMosquePage() {
           </span>
         </div>
         <div className="success-actions">
+          {isAuthenticated && (
+            <Link to="/profile" className="btn btn-primary">
+              Track in My Submissions →
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => {
               setSuccessData(null);
-              setFormData({ name: '', address: '', latitude: '', longitude: '', submittedBy: '' });
+              setFormData({ name: '', address: '', latitude: '', longitude: '', submittedBy: user?.name || '' });
               setSelectedFile(null);
               setPreviewUrl(null);
             }}
-            className="btn btn-primary"
+            className={isAuthenticated ? 'btn btn-secondary' : 'btn btn-primary'}
           >
             + Submit Another Mosque
           </button>

@@ -1,23 +1,47 @@
 import { Routes, Route, Link } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import MainLayout from './layouts/MainLayout';
 import HomePage from './pages/HomePage';
 import ExplorePage from './pages/ExplorePage';
 import SubmitMosquePage from './pages/SubmitMosquePage';
 import MosqueDetailPage from './pages/MosqueDetailPage';
 import ModerationPage from './pages/ModerationPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ProfilePage from './pages/ProfilePage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<HomePage />} />
-        <Route path="explore" element={<ExplorePage />} />
-        <Route path="submit" element={<SubmitMosquePage />} />
-        <Route path="mosque/:id" element={<MosqueDetailPage />} />
-        <Route path="moderation" element={<ModerationPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="explore" element={<ExplorePage />} />
+          <Route path="submit" element={<SubmitMosquePage />} />
+          <Route path="mosque/:id" element={<MosqueDetailPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route
+            path="profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="moderation"
+            element={
+              <ProtectedRoute roles={['moderator', 'admin']}>
+                <ModerationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </AuthProvider>
   );
 }
 

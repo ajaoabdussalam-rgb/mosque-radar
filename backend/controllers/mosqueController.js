@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Mosque = require('../models/Mosque');
 
 /**
@@ -65,9 +66,26 @@ const getMosques = async (req, res, next) => {
       filter.status = 'verified';
     }
 
+    // Text search: when a search query is provided, apply MongoDB $text search
+    const searchTerm = req.query.search ? req.query.search.trim() : '';
+    if (searchTerm) {
+      filter.$text = { $search: searchTerm };
+    }
+
+    // Build the query
+    let query = Mosque.find(filter);
+
+    // When searching, project and sort by text relevance score
+    if (searchTerm) {
+      query = query
+        .select({ score: { $meta: 'textScore' } })
+        .sort({ score: { $meta: 'textScore' } });
+    } else {
+      query = query.sort({ createdAt: -1 });
+    }
+
     const [mosques, total] = await Promise.all([
-      Mosque.find(filter)
-        .sort({ createdAt: -1 })
+      query
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -136,12 +154,18 @@ const createMosque = async (req, res, next) => {
 
     // Untrusted Input Rule:
     // Clients cannot self-verify or set moderation metadata on creation.
+    const createdBy = req.user ? req.user._id : undefined;
+    const submittedBy = (req.user && (!submission.submittedBy || submission.submittedBy === 'anonymous'))
+      ? req.user.name
+      : (submission.submittedBy || 'anonymous');
+
     const newMosque = new Mosque({
       name: submission.name,
       address: submission.address,
       location: submission.location,
       images: submission.images,
-      submittedBy: submission.submittedBy,
+      submittedBy,
+      createdBy,
       status: 'pending' // Enforce pending status unconditionally
     });
 
@@ -302,9 +326,9 @@ const getNearbyMosques = async (req, res, next) => {
 };
 
 /**
- * @desc    Get pending mosques awaiting moderation (moderation queue)
+ * @desc    Get mosques for moderation (defaults to pending, supports status filtering)
  * @route   GET /api/mosques/moderation/queue
- * @access  Public / Moderator
+ * @access  Moderator / Admin
  */
 const getPendingMosques = async (req, res, next) => {
   try {
@@ -312,11 +336,17 @@ const getPendingMosques = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const filter = { status: 'pending' };
+    const requestedStatus = req.query.status || 'pending';
+    const filter = {};
+    if (requestedStatus !== 'all') {
+      filter.status = requestedStatus;
+    }
+
+    const sortOrder = requestedStatus === 'pending' ? { createdAt: 1 } : { updatedAt: -1 };
 
     const [mosques, total] = await Promise.all([
       Mosque.find(filter)
-        .sort({ createdAt: 1 }) // FIFO: review oldest submissions first
+        .sort(sortOrder)
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -330,6 +360,95 @@ const getPendingMosques = async (req, res, next) => {
       page,
       totalPages: Math.ceil(total / limit) || 1,
       data: mosques
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Check potential duplicate mosques by proximity and/or name
+ * @route   GET /api/mosques/moderation/duplicates
+ * @access  Moderator / Admin
+ */
+const checkDuplicates = async (req, res, next) => {
+  try {
+    const { lat, lng, name, excludeId } = req.query;
+    const radiusMeters = Math.min(5000, Math.max(50, parseInt(req.query.radius, 10) || 500)); // default 500m
+
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    const hasValidCoords =
+      !isNaN(parsedLat) &&
+      !isNaN(parsedLng) &&
+      parsedLat >= -90 &&
+      parsedLat <= 90 &&
+      parsedLng >= -180 &&
+      parsedLng <= 180;
+
+    let geoMatches = [];
+    if (hasValidCoords) {
+      const geoFilter = {};
+      if (excludeId && mongoose.Types.ObjectId.isValid(excludeId)) {
+        geoFilter._id = { $ne: new mongoose.Types.ObjectId(excludeId) };
+      }
+
+      geoMatches = await Mosque.aggregate([
+        {
+          $geoNear: {
+            near: {
+              type: 'Point',
+              coordinates: [parsedLng, parsedLat]
+            },
+            distanceField: 'distanceMeters',
+            maxDistance: radiusMeters,
+            spherical: true,
+            query: geoFilter
+          }
+        },
+        { $limit: 5 },
+        {
+          $addFields: {
+            distanceMeters: { $round: ['$distanceMeters', 0] },
+            distanceKm: { $round: [{ $divide: ['$distanceMeters', 1000] }, 2] },
+            matchType: 'proximity'
+          }
+        }
+      ]);
+    }
+
+    let nameMatches = [];
+    if (name && name.trim().length >= 3) {
+      const trimmedName = name.trim();
+      const nameFilter = {
+        name: { $regex: trimmedName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), $options: 'i' }
+      };
+      if (excludeId && mongoose.Types.ObjectId.isValid(excludeId)) {
+        nameFilter._id = { $ne: new mongoose.Types.ObjectId(excludeId) };
+      }
+
+      // Exclude documents already captured in geoMatches
+      const geoIds = geoMatches.map((m) => m._id.toString());
+      if (geoIds.length > 0) {
+        nameFilter._id = {
+          ...nameFilter._id,
+          $nin: geoIds.map((id) => new mongoose.Types.ObjectId(id))
+        };
+      }
+
+      const foundByName = await Mosque.find(nameFilter).limit(5).lean();
+      nameMatches = foundByName.map((m) => ({
+        ...m,
+        matchType: 'name'
+      }));
+    }
+
+    const duplicates = [...geoMatches, ...nameMatches];
+
+    res.status(200).json({
+      success: true,
+      count: duplicates.length,
+      data: duplicates
     });
   } catch (err) {
     next(err);
@@ -396,6 +515,7 @@ module.exports = {
   getMosques,
   getNearbyMosques,
   getPendingMosques,
+  checkDuplicates,
   getMosqueById,
   createMosque,
   updateMosque,

@@ -23,6 +23,12 @@ async function request(endpoint, options = {}) {
     ...options.headers
   };
 
+  // Attach JWT Bearer token if present in localStorage
+  const token = localStorage.getItem('token');
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   // Only set application/json if body is not FormData
   if (!(options.body instanceof FormData) && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
@@ -52,9 +58,15 @@ async function request(endpoint, options = {}) {
 }
 
 export const api = {
-  // Fetch mosques (public discovery or status filtered)
+  // Fetch mosques (public discovery or status filtered, with optional text search)
   getMosques: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const filteredParams = {};
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        filteredParams[key] = value;
+      }
+    });
+    const query = new URLSearchParams(filteredParams).toString();
     return request(`/mosques${query ? `?${query}` : ''}`);
   },
 
@@ -96,7 +108,7 @@ export const api = {
     });
   },
 
-  // Moderation queue
+  // Moderation queue (supports status filtering: pending, verified, rejected)
   getModerationQueue: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/mosques/moderation/queue${query ? `?${query}` : ''}`);
@@ -107,5 +119,35 @@ export const api = {
     request(`/mosques/${id}/verify`, {
       method: 'PATCH',
       body: JSON.stringify(decision)
-    })
+    }),
+
+  // Moderate / edit mosque details prior to verification
+  updateMosque: (id, updates) =>
+    request(`/mosques/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
+    }),
+
+  // Check potential duplicates by proximity and/or name
+  checkDuplicates: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/mosques/moderation/duplicates${query ? `?${query}` : ''}`);
+  },
+
+  // Authentication & User Profile
+  login: (credentials) =>
+    request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials)
+    }),
+
+  register: (userData) =>
+    request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    }),
+
+  getMe: () => request('/auth/me'),
+
+  getMySubmissions: () => request('/auth/my-submissions')
 };

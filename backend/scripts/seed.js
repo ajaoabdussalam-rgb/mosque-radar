@@ -2,7 +2,29 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const Mosque = require('../models/Mosque');
+const User = require('../models/User');
 const connectDB = require('../config/db');
+
+const seedUsers = [
+  {
+    name: 'Admin Moderator',
+    email: 'admin@mosqueradar.com',
+    password: 'Admin123!',
+    role: 'admin'
+  },
+  {
+    name: 'Community Moderator',
+    email: 'mod@mosqueradar.com',
+    password: 'Mod123!',
+    role: 'moderator'
+  },
+  {
+    name: 'Bilal User',
+    email: 'user@mosqueradar.com',
+    password: 'User123!',
+    role: 'user'
+  }
+];
 
 const seedMosques = [
   {
@@ -138,8 +160,15 @@ const seedMosques = [
 async function runSeed() {
   try {
     await connectDB();
-    console.log('Clearing existing mosques...');
+    console.log('Clearing existing mosques and users...');
     await Mosque.deleteMany({});
+    await User.deleteMany({});
+
+    console.log(`Seeding ${seedUsers.length} demo users...`);
+    for (const u of seedUsers) {
+      await User.create(u);
+    }
+    console.log('Demo users seeded successfully!');
 
     console.log(`Seeding ${seedMosques.length} mosques...`);
     const created = await Mosque.insertMany(seedMosques);
